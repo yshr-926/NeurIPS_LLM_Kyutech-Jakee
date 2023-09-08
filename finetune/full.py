@@ -33,7 +33,7 @@ eval_iters = 100
 log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
-override_max_seq_length = None
+override_max_seq_length = 2048
 
 # Hyperparameters
 learning_rate = 3e-3
@@ -41,8 +41,8 @@ batch_size = 64 / devices
 micro_batch_size = 1
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
-epoch_size = 50000  # train dataset size
-num_epochs = 5
+epoch_size = 500  # train dataset size
+num_epochs = 1
 max_iters = num_epochs * (epoch_size // micro_batch_size) // devices
 weight_decay = 0.02
 warmup_steps = 2 * (epoch_size // micro_batch_size) // devices // gradient_accumulation_iters  # 2 epochs

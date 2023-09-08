@@ -16,10 +16,31 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 from lm_eval_harness import EvalHarnessBase
 
+# from scripts.prepare_alpaca import generate_prompt
 from lit_gpt import Tokenizer
 from lit_gpt.lora import GPT, Block, Config, merge_lora_weights
 from lit_gpt.utils import check_valid_checkpoint_dir, get_default_supported_precision, lazy_load, quantization
-from scripts.prepare_alpaca import generate_prompt
+
+# print(sys.path)
+# # from scripts.test import hello
+# # import scripts
+# from lit_gpt.test import hello
+# hello()
+def generate_prompt(example):
+    """Generates a standardized message to prompt the model with an instruction, optional input and a
+    'response' field."""
+
+    if example["input"]:
+        return (
+            "Below is an instruction that describes a task, paired with an input that provides further context. "
+            "Write a response that appropriately completes the request.\n\n"
+            f"### Instruction:\n{example['instruction']}\n\n### Input:\n{example['input']}\n\n### Response:"
+        )
+    return (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        f"### Instruction:\n{example['instruction']}\n\n### Response:"
+    )
 
 lora_r = 8
 lora_alpha = 16

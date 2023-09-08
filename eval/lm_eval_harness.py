@@ -128,7 +128,7 @@ class EvalHarnessBase(BaseLM):
         out = generate(
             model=self.model,
             idx=context[0],
-            max_new_tokens=max_length,
+            max_returned_tokens=max_length,
             max_seq_length=self.model.config.block_size,
             temperature=self.temperature,
             top_k=None,

@@ -33,7 +33,7 @@ eval_iters = 100
 log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
-override_max_seq_length = None
+override_max_seq_length = 2048
 
 # Hyperparameters
 learning_rate = 3e-3
