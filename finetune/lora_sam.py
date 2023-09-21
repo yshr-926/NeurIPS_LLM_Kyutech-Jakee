@@ -21,7 +21,7 @@ from lit_gpt.utils import (
     check_valid_checkpoint_dir,
     chunked_cross_entropy,
     get_default_supported_precision,
-    lazy_load,
+    load_checkpoint,
     num_parameters,
     quantization,
     step_csv_logger,
@@ -29,12 +29,14 @@ from lit_gpt.utils import (
 from scripts.prepare_alpaca import generate_prompt
 # from scripts import generate_prompt
 from my_utils.utils_sum import enable_running_stats, disable_running_stats
+from my_utils.utils import get_optimizer, get_bnb_optimizer
 from optimizers import *
 
 eval_interval = 100
 save_interval = 100
 eval_iters = 100
-log_interval = 200
+eval_max_new_tokens = 100
+# log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
 override_max_seq_length = 2048
@@ -45,7 +47,7 @@ batch_size = 128
 micro_batch_size = 1
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
-max_iters = 50000  # train dataset size
+# max_iters = 500  # train dataset size
 weight_decay = 0.01
 lora_r = 8
 lora_alpha = 16
@@ -74,6 +76,9 @@ def setup(
     out_dir: Path = Path("out/lora/alpaca"),
     precision: Optional[str] = None,
     quantize: Optional[Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq"]] = None,
+    optim_name: str = "SAM",
+    max_iters: int = 50000,
+    log_interval: int = 200,
 ):
     precision = precision or get_default_supported_precision(training=True)
 
@@ -96,15 +101,19 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, quantize)
 
 
 def main(
         fabric: L.Fabric, 
         data_dir: Path, 
         checkpoint_dir: Path, 
-        out_dir: Path, 
-        quantize: Optional[str] = None):
+        out_dir: Path,
+        max_iters,
+        optim_name,
+        log_interval,
+        quantize: Optional[str] = None,
+        ):
     check_valid_checkpoint_dir(checkpoint_dir)
 
     speed_monitor = SpeedMonitor(fabric, window_size=50, time_unit="seconds")
@@ -133,31 +142,37 @@ def main(
     )
     checkpoint_path = checkpoint_dir / "lit_model.pth"
     fabric.print(f"Loading model {str(checkpoint_path)!r} with {config.__dict__}")
-    with fabric.init_module(empty_init=False), quantization(quantize):
+    with fabric.init_module(empty_init=(devices > 1)), quantization(quantize):
         model = GPT(config)
-    with lazy_load(checkpoint_path) as checkpoint:
-        # strict=False because missing keys due to LoRA weights not contained in state dict
-        model.load_state_dict(checkpoint, strict=False)
-
     mark_only_lora_as_trainable(model)
 
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
     fabric.print(f"Number of non trainable parameters: {num_parameters(model, requires_grad=False):,}")
+
+    if quantize:
+        # for quantization, need to load before moving to device
+        load_checkpoint(fabric, model, checkpoint_path, strict=False)
+
+    model = fabric.setup_module(model)
+
     trainable_params = [p for p in model.parameters() if p.requires_grad]
-
     if quantize and quantize.startswith("bnb."):
-        import bitsandbytes as bnb
-
-        optimizer = bnb.optim.PagedAdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
+        raise NotImplementedError(
+            "SAM for quantization is not supported."
+        )
     else:
         optimizer = SAM(trainable_params, base_optimizer=torch.optim.SGD, rho=rho, adaptive=adaptive,
                 lr=learning_rate, weight_decay=weight_decay)
-    model, optimizer = fabric.setup(model, optimizer)
+    optimizer = fabric.setup_optimizers(optimizer)
+
+    if not quantize:
+        # strict=False because missing keys due to LoRA weights not contained in state dict
+        load_checkpoint(fabric, model, checkpoint_path, strict=False)
 
     fabric.seed_everything(1337 + fabric.global_rank)
 
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     # fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
@@ -165,7 +180,7 @@ def main(
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / "lit_model_lora_sam_finetuned.pth"
+    save_path = out_dir / "lit_model_lora_SAM_finetuned.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
 
@@ -178,9 +193,12 @@ def train(
     checkpoint_dir: Path,
     out_dir: Path,
     speed_monitor: SpeedMonitor,
+    max_iters,
+    log_interval
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
+    model.max_seq_length = max_seq_length
 
     validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
 
@@ -223,7 +241,7 @@ def train(
             # add for SAM
             enable_running_stats(model)
 
-            logits = model(input_ids, max_seq_length=max_seq_length, lm_head_chunk_size=128)
+            logits = model(input_ids, lm_head_chunk_size=128)
             # shift the targets such that output n predicts token n+1
             logits[-1] = logits[-1][..., :-1, :]
             loss = chunked_cross_entropy(logits, targets[..., 1:])
@@ -236,7 +254,7 @@ def train(
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             disable_running_stats(model)
 
-            logits2 = model(input_ids, max_seq_length=max_seq_length, lm_head_chunk_size=128)
+            logits2 = model(input_ids, lm_head_chunk_size=128)
             # shift the targets such that output n predicts token n+1
             logits2[-1] = logits2[-1][..., :-1, :]
             fabric.backward(chunked_cross_entropy(logits2, targets[..., 1:]) / gradient_accumulation_iters)
@@ -273,7 +291,7 @@ def train(
             save_lora_checkpoint(fabric, model, checkpoint_path)
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def validate(
     fabric: L.Fabric, model: GPT, val_data: List[Dict], tokenizer: Tokenizer, longest_seq_length: int
 ) -> torch.Tensor:
@@ -292,14 +310,13 @@ def validate(
     sample = {"instruction": instruction, "input": ""}
     prompt = generate_prompt(sample)
     encoded = tokenizer.encode(prompt, device=fabric.device)
-    max_returned_tokens = len(encoded) + 100
-    output = generate(
-        model, idx=encoded, max_returned_tokens=max_returned_tokens, max_seq_length=max_returned_tokens, temperature=0.8
-    )
+    with fabric.init_tensor():
+        # do not set `max_seq_length=max_returned_token` because memory is not a concern here
+        model.set_kv_cache(batch_size=1)
+    output = generate(model, encoded, max_returned_tokens=len(encoded) + eval_max_new_tokens, temperature=0.8)
+    model.clear_kv_cache()
     output = tokenizer.decode(output)
     fabric.print(output)
-
-    model.reset_cache()
 
     model.train()
     return val_loss

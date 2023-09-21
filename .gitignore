@@ -14,3 +14,11 @@ out
 wandb
 
 tests/original_falcon_40b.py
+
+logs
+optimizers
+sh
+results
+rmf.py
+nohup.out
+*.json

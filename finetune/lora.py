@@ -28,12 +28,13 @@ from lit_gpt.utils import (
 )
 from scripts.prepare_alpaca import generate_prompt
 # from scripts import generate_prompt
+from my_utils.utils import get_optimizer, get_bnb_optimizer
 
 eval_interval = 100
 save_interval = 100
 eval_iters = 100
 eval_max_new_tokens = 100
-log_interval = 1
+# log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
 override_max_seq_length = 2048
@@ -44,7 +45,7 @@ batch_size = 128
 micro_batch_size = 1
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
-max_iters = 500  # train dataset size
+# max_iters = 500  # train dataset size
 weight_decay = 0.01
 lora_r = 8
 lora_alpha = 16
@@ -59,6 +60,8 @@ warmup_steps = 100
 
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 
+# limit an caching allocator to allocated memory on a CUDA device
+torch.cuda.set_per_process_memory_fraction(0.49, 0)
 
 def setup(
     data_dir: Path = Path("data/alpaca"),
@@ -66,6 +69,9 @@ def setup(
     out_dir: Path = Path("out/lora/alpaca"),
     precision: Optional[str] = None,
     quantize: Optional[Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq"]] = None,
+    optim_name: str = "AdamW",
+    max_iters: int = 50000,
+    log_interval: int = 200,
 ):
     precision = precision or get_default_supported_precision(training=True)
 
@@ -88,10 +94,19 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, quantize)
 
 
-def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path, quantize: Optional[str] = None):
+def main(
+        fabric: L.Fabric, 
+        data_dir: Path, 
+        checkpoint_dir: Path, 
+        out_dir: Path,
+        max_iters,
+        optim_name,
+        log_interval,
+        quantize: Optional[str] = None,
+        ):
     check_valid_checkpoint_dir(checkpoint_dir)
 
     speed_monitor = SpeedMonitor(fabric, window_size=50, time_unit="seconds")
@@ -137,9 +152,9 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path, 
     if quantize and quantize.startswith("bnb."):
         import bitsandbytes as bnb
 
-        optimizer = bnb.optim.PagedAdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = get_bnb_optimizer(optim_name, trainable_params, lr=learning_rate, weight_decay=weight_decay)
     else:
-        optimizer = torch.optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = get_optimizer(optim_name, trainable_params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = fabric.setup_optimizers(optimizer)
 
     if not quantize:
@@ -149,13 +164,15 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path, 
     fabric.seed_everything(1337 + fabric.global_rank)
 
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor)
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval)
+    total_time = time.perf_counter()-train_time
+    fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
+    # fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / "lit_model_lora_finetuned.pth"
+    save_path = out_dir / f"lit_model_lora_{optim_name}_finetuned.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
 
@@ -168,6 +185,8 @@ def train(
     checkpoint_dir: Path,
     out_dir: Path,
     speed_monitor: SpeedMonitor,
+    max_iters,
+    log_interval
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
