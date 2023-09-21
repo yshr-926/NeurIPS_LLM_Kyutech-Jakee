@@ -1,7 +1,7 @@
 models=('Llama-2-7b-hf')
 datasets=('dolly' 'lima')
-finetunes=('lora' 'lora_sam')
-optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion')
+finetunes=('lora')
+optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion' 'SAM')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
@@ -17,7 +17,12 @@ do
             for optimizer in ${optimizers[@]}
             do
                 mkdir -p logs/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today &&
-                python finetune/$finetune.py \
+                if [ $optimizer = 'SAM' ]; then
+                    fine='lora_sam'
+                else
+                    fine=$finetune
+                fi
+                python finetune/$fine.py \
                 --data_dir data/$dataset-$model \
                 --checkpoint_dir checkpoints/meta-llama/$model \
                 --out_dir out/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today \
@@ -30,4 +35,4 @@ do
     done
 done
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh >sh_logs/llama.log 2>sh_logs/error_llama.log &
+# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh 2>sh_logs/error_llama.log &

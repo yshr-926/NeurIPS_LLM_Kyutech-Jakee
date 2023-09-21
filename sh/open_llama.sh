@@ -1,34 +1,39 @@
 models=('open_llama_3b' 'open_llama_7b')
-datasets=('lima')
-finetunes=('lora' 'lora_sam')
+datasets=('dolly' 'lima')
+finetunes=('lora')
+optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion' 'SAM')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
+
+quantize='not_quantize'
+max_iters=50000
+
 for dataset in ${datasets[@]}
 do
     for finetune in ${finetunes[@]}
     do
         for model in ${models[@]}
         do
-            # python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/openlm-research/$model &&
-            if [ $dataset = 'dolly' ]; then
-                if [ ! -d data/$dataset-$model ]; then
-                python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model 
+            for optimizer in ${optimizers[@]}
+            do
+                mkdir -p logs/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today &&
+                if [ $optimizer = 'SAM' ]; then
+                    fine='lora_sam'
+                else
+                    fine=$finetune
                 fi
-            else
-                if [ ! -d data/$dataset-$model ]; then
-                python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model --access_token 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
-                fi
-            fi
-            mkdir -p logs/$model/$dataset/$finetune/$today &&
-            python finetune/$finetune.py \
-            --data_dir data/$dataset-$model \
-            --checkpoint_dir checkpoints/openlm-research/$model \
-            --out_dir out/$model/$dataset/$finetune/$today \
-            --precision "bf16-true" \
-            >logs/$model/$dataset/$finetune/$today/$time.log
+                python finetune/$fine.py \
+                --data_dir data/$dataset-$model \
+                --checkpoint_dir checkpoints/openlm-research/$model \
+                --out_dir out/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today \
+                --precision "bf16-true" \
+                --optim_name $optimizer \
+                --max_iters $max_iters \
+                >logs/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today/$time.log
+            done
         done
     done
 done
 
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=0 nohup bash sh/open_llama.sh >open_llama.log 2>error_open_llama.log &
+# CUDA_VISIBLE_DEVICES=1 nohup bash sh/open_llama.sh 2>sh_logs/error_open_llama.log &

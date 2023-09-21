@@ -1,19 +1,15 @@
-models=('open_llama_3b' 'open_llama_7b' 'open_llama_13b')
+models=('open_llama_3b' 'open_llama_7b')
 datasets=('dolly' 'lima')
 
-for dataset in ${datasets[@]}
+for model in ${models[@]}
 do
-    for model in ${models[@]}
+    python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/openlm-research/$model &&
+    for dataset in ${datasets[@]}
     do
-        python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/openlm-research/$model &&
         if [ $dataset = 'dolly' ]; then
-            if [ ! -d data/$dataset-$model ]; then
-            python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model 
-            fi
+            python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model --max_seq_length 2048
         else
-            if [ ! -d data/$dataset-$model ]; then
-            python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model --access_token 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
-            fi
+            python scripts/prepare_$dataset.py --checkpoint_dir checkpoints/openlm-research/$model --destination_path data/$dataset-$model --access_token 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 --max_seq_length 2048
         fi
     done
 done
