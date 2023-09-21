@@ -89,8 +89,7 @@ class EvalHarnessBase(BaseLM):
 
     @property
     def max_length(self):
-        # TODO: keep decoupled from block_size
-        return self.model.config.block_size
+        return self.model.max_seq_length
 
     @property
     def max_gen_toks(self):
@@ -124,17 +123,7 @@ class EvalHarnessBase(BaseLM):
     def _model_generate(self, context, max_length, eos_token_id):
         assert context.shape[0] == 1
         out = generate(
-<<<<<<< ours
-            model=self.model,
-            idx=context[0],
-            max_returned_tokens=max_length,
-            max_seq_length=self.model.config.block_size,
-            temperature=self.temperature,
-            top_k=None,
-            eos_id=eos_token_id,
-=======
             self.model, context[0], max_length, temperature=self.temperature, top_k=None, eos_id=eos_token_id
->>>>>>> theirs
         )
 
         return self.tokenizer.decode(out)
