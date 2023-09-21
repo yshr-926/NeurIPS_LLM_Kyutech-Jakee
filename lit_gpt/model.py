@@ -22,7 +22,7 @@ class GPT(nn.Module):
         assert config.padded_vocab_size is not None
         self.config = config
 
-        self.lm_head = nn.Linear(config.n_embd, config.padded_vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias)
         self.transformer = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(config.padded_vocab_size, config.n_embd),
@@ -127,7 +127,7 @@ class GPT(nn.Module):
             # passing `attn_mask` to SDPA downgrades it to use the inefficient implementation. since we only need the mask
             # for the kv-cache support (only during inference), we only create it in that situation
             # this will be resolved by https://github.com/pytorch/pytorch/issues/96099
-            ones = torch.ones((self.config.block_size, max_seq_length), device=device, dtype=torch.bool)
+            ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
             self.mask_cache = torch.tril(ones).unsqueeze(0).unsqueeze(0)
 
     def clear_kv_cache(self) -> None:
@@ -283,9 +283,11 @@ class GptNeoxMLP(nn.Module):
         self.fc = nn.Linear(config.n_embd, config.intermediate_size, bias=config.bias)
         self.proj = nn.Linear(config.intermediate_size, config.n_embd, bias=config.bias)
 
+        self.config = config
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.fc(x)
-        x = torch.nn.functional.gelu(x)
+        x = torch.nn.functional.gelu(x, approximate=self.config.gelu_approximate)
         return self.proj(x)
 
 

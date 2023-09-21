@@ -14,6 +14,7 @@ out
 wandb
 
 tests/original_falcon_40b.py
+<<<<<<< HEAD
 
 logs
 optimizers
@@ -22,3 +23,6 @@ results
 rmf.py
 nohup.out
 *.json
+=======
+tests/original_phi_1_5.py
+>>>>>>> 0f71b63ebaea0a3114d3d66b7f1d33e330ef4ef2
