@@ -72,6 +72,7 @@ def setup(
     optim_name: str = "AdamW",
     max_iters: int = 50000,
     log_interval: int = 200,
+    save_hf: bool = False
 ):
     precision = precision or get_default_supported_precision(training=True)
 
@@ -94,7 +95,7 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, save_hf, quantize)
 
 
 def main(
@@ -105,6 +106,7 @@ def main(
         max_iters,
         optim_name,
         log_interval,
+        save_hf,
         quantize: Optional[str] = None,
         ):
     check_valid_checkpoint_dir(checkpoint_dir)
@@ -174,6 +176,22 @@ def main(
     # Save the final LoRA checkpoint at the end of training
     save_path = out_dir / f"lit_model_lora_{optim_name}_finetuned.pth"
     save_lora_checkpoint(fabric, model, save_path)
+
+    # save model to huggingface
+    if save_hf is True:
+        from huggingface_hub import login, HfApi
+        os.environ["HUGGINGFACE_TOKEN"] = "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"
+        os.environ["HUGGINGFACE_REPO"] = "yshr-926/test_model2"
+        login(token="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")
+        
+        api = HfApi()
+
+        api.upload_folder(
+            folder_path= out_dir,
+            repo_id=os.environ["HUGGINGFACE_REPO"], 
+            repo_type='model', 
+            )
+    
 
 
 def train(
