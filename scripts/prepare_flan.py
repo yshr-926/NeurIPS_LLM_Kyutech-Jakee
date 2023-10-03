@@ -15,10 +15,11 @@ sys.path.append(str(wd))
 
 from lit_gpt.tokenizer import Tokenizer
 
-# TODO access_token が必要かどうか（なくてもいけそうならそれでいい）
-# TODO huggingface-cli login が必要かどうか（なくてもいけそうならそれでいい）
-# TODO ダウンロード，分割はいい感じにいっているけど，問題なく finetuning できるか（多分できると思う）
-# TODO 以上，次に学校に行ったタイミングで確認する
+"""
+python3 scripts/prepare_flan.py \
+    --checkpoint_dir "checkpoints/EleutherAI/pythia-70m" \
+    --destination_path data/pythia/pythia-70m/flan
+"""
 
 def prepare(
     destination_path: Path = Path("data/flan"),
@@ -37,13 +38,6 @@ def prepare(
     The output is a training and test dataset saved as `train.pt` and `test.pt`,
     which stores the preprocessed and tokenized prompts and labels.
     """
-
-    if access_token is None:
-        raise ValueError(
-            "FLAN requires authentication, please set the `HF_TOKEN=your_token` environment"
-            " variable or pass --access_token=your_token. You can find your token by visiting"
-            " https://huggingface.co/settings/tokens"
-        )
 
     if max_seq_length is None:
         with open(checkpoint_dir / "lit_config.json", "r", encoding="utf-8") as file:
