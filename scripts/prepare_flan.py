@@ -182,7 +182,6 @@ def format_dataset(dataset_partition, include_multi_turn_conversations, ignore_d
                 formatted_ds.append({"instruction": convo[i], "input": "", "output": convo[i + 1]})
         else:
             formatted_ds.append({"instruction": convo, "input": "", "output": target})
-        sys.exit()
 
     return formatted_ds
 
