@@ -1,7 +1,7 @@
 models=('Llama-2-7b-hf')
 datasets=('dolly' 'lima')
 finetunes=('lora')
-optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion' 'SAM')
+optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
