@@ -26,6 +26,7 @@ from lit_gpt.utils import (
     quantization,
     step_csv_logger,
 )
+
 from scripts.prepare_alpaca import generate_prompt
 # from scripts import generate_prompt
 from my_utils.utils import get_optimizer, get_bnb_optimizer
@@ -41,7 +42,7 @@ override_max_seq_length = 2048
 
 # Hyperparameters
 learning_rate = 3e-4
-batch_size = 128
+batch_size = 128    # TODO 1を見てみたい（Lima）せいぜい32
 micro_batch_size = 1
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
@@ -72,8 +73,14 @@ def setup(
     optim_name: str = "AdamW",
     max_iters: int = 50000,
     log_interval: int = 200,
+    lr: float = 3e-4,
+    bs: int = 128
 ):
     precision = precision or get_default_supported_precision(training=True)
+    
+    global learning_rate, batch_size, gradient_accumulation_iters
+    learning_rate, batch_size, gradient_accumulation_iters = lr, bs, bs // micro_batch_size
+    assert gradient_accumulation_iters > 0
 
     fabric_devices = devices
     if fabric_devices > 1:
