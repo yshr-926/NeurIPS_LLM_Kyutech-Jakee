@@ -149,8 +149,6 @@ def main(
     fabric.print(f"Loading model {str(checkpoint_path)!r} with {config.__dict__}")
     with fabric.init_module(empty_init=(devices > 1)), quantization(quantize):
         model = GPT(config)
-    # averaged_model = AveragedModel(model)
-    # averaged_model.to(fabric.device)
     mark_only_lora_as_trainable(model)
 
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
@@ -304,7 +302,7 @@ def train(
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.perf_counter()
-            val_loss = validate(fabric, model, val_data, tokenizer, longest_seq_length)
+            val_loss = validate(fabric, model, val_data, tokenizer, micro_batch_size, longest_seq_length)
             t1 = time.perf_counter() - t0
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms")
