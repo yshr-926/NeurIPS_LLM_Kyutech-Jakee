@@ -31,7 +31,8 @@ from scripts.prepare_alpaca import generate_prompt
 from my_utils.utils import get_optimizer, get_bnb_optimizer
 # from torch.optim.swa_utils import AveragedModel
 from copy import deepcopy
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from optimizers import *
 eval_interval = 100
 save_interval = 100
 eval_iters = 100
@@ -59,7 +60,7 @@ lora_projection = False
 lora_mlp = False
 lora_head = False
 warmup_steps = 100
-
+eta_min = 0.0
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 
 # limit an caching allocator to allocated memory on a CUDA device
@@ -169,7 +170,8 @@ def main(
     else:
         optimizer = get_optimizer(optim_name, trainable_params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = fabric.setup_optimizers(optimizer)
-
+    # scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=max_iters//batch_size, eta_min=eta_min)
+    scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=warmup_steps, max_epochs=max_iters//batch_size, warmup_start_lr=0.00001, eta_min=eta_min)
     if not quantize:
         # strict=False because missing keys due to LoRA weights not contained in state dict
         load_checkpoint(fabric, model, checkpoint_path, strict=False)
@@ -177,19 +179,19 @@ def main(
     fabric.seed_everything(1337 + fabric.global_rank)
 
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / f"lit_model_lora_{optim_name}_finetuned.pth"
+    save_path = out_dir / f"lit_model_lora_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
     for i, p_averaged in enumerate(averaged_params):
         trainable_params[i] = p_averaged
-    save_ave_path = out_dir / f"lit_avemodel_lora_{optim_name}_finetuned.pth"
+    save_ave_path = out_dir / f"lit_avemodel_lora_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
     # save model to huggingface
@@ -224,7 +226,8 @@ def train(
     micro_batch_size,
     learning_rate,
     trainable_params,
-    averaged_params
+    averaged_params,
+    scheduler
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
@@ -255,11 +258,11 @@ def train(
     start_averaged = max_iters*0.8
     n_averaged = 0
     for iter_num in range(max_iters):
-        if step_count <= warmup_steps:
-            # linear warmup
-            lr = learning_rate * step_count / warmup_steps
-            for param_group in optimizer.param_groups:
-                param_group["lr"] = lr
+        # if step_count <= warmup_steps:
+        #     # linear warmup
+        #     lr = learning_rate * step_count / warmup_steps
+        #     for param_group in optimizer.param_groups:
+        #         param_group["lr"] = lr
 
         iter_t0 = time.perf_counter()
 
@@ -279,7 +282,10 @@ def train(
             optimizer.step()
             optimizer.zero_grad()
             step_count += 1
-
+            
+            scheduler.step()
+            # if step_count > warmup_steps:
+            #     scheduler.step()
             # update Averaged model
             if iter_num >= start_averaged:
                 update_parameters(averaged_params, trainable_params, n_averaged)
@@ -296,7 +302,7 @@ def train(
         )
         if iter_num % log_interval == 0:
             fabric.print(
-                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
+                f"lr: {optimizer.param_groups[0]['lr']:.6f} iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
 
@@ -307,9 +313,9 @@ def train(
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms")
             fabric.barrier()
-        if not is_accumulating and step_count % save_interval == 0:
-            checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
-            save_lora_checkpoint(fabric, model, checkpoint_path)
+        # if not is_accumulating and step_count % save_interval == 0:
+        #     checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
+        #     save_lora_checkpoint(fabric, model, checkpoint_path)
 
 
 @torch.inference_mode()
