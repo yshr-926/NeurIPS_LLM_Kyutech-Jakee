@@ -186,12 +186,12 @@ def main(
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / f"lit_model_lora_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_path = out_dir / f"lit_model_lora_Cos_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
     for i, p_averaged in enumerate(averaged_params):
         trainable_params[i] = p_averaged
-    save_ave_path = out_dir / f"lit_avemodel_lora_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_ave_path = out_dir / f"lit_avemodel_lora_Cos_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
     # save model to huggingface
