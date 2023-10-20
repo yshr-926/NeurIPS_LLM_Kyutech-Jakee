@@ -72,6 +72,10 @@ def setup(
     optim_name: str = "AdamW",
     max_iters: int = 50000,
     log_interval: int = 200,
+    batch_size: int = 128,
+    micro_batch_size: int = 1,
+    learning_rate: float = 3e-4,
+    weight_decay: float = 0.01,
     save_hf: bool = False
 ):
     precision = precision or get_default_supported_precision(training=True)
@@ -182,7 +186,7 @@ def main(
         from huggingface_hub import login, HfApi
         os.environ["HUGGINGFACE_TOKEN"] = "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"
         os.environ["HUGGINGFACE_REPO"] = "yshr-926/test_model2"
-        login(token="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")
+        login(token=os.getenv("HUGGINGFACE_TOKEN"))
         
         api = HfApi()
 

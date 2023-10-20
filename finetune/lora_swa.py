@@ -79,7 +79,8 @@ def setup(
     micro_batch_size: int = 1,
     learning_rate: float = 3e-4,
     weight_decay: float = 0.01,
-    save_hf: bool = False
+    save_hf: bool = False,
+    lr_type: str = "CosineAnnealingLR"
 ):
     precision = precision or get_default_supported_precision(training=True)
 
@@ -102,7 +103,7 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, save_hf, batch_size, micro_batch_size, learning_rate, weight_decay, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, save_hf, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, quantize)
 
 
 def main(
@@ -118,6 +119,7 @@ def main(
         micro_batch_size,
         learning_rate,
         weight_decay,
+        lr_type,
         quantize: Optional[str] = None,
         ):
     check_valid_checkpoint_dir(checkpoint_dir)
@@ -171,7 +173,11 @@ def main(
         optimizer = get_optimizer(optim_name, trainable_params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = fabric.setup_optimizers(optimizer)
     # scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=max_iters//batch_size, eta_min=eta_min)
-    scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=warmup_steps, max_epochs=max_iters//batch_size, warmup_start_lr=0.00001, eta_min=eta_min)
+    if lr_type == "CosineAnnealingLR":
+        scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=warmup_steps, max_epochs=max_iters//batch_size, warmup_start_lr=0.00001, eta_min=eta_min)
+    else:
+        scheduler = "Fix"
+    
     if not quantize:
         # strict=False because missing keys due to LoRA weights not contained in state dict
         load_checkpoint(fabric, model, checkpoint_path, strict=False)
@@ -186,12 +192,12 @@ def main(
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / f"lit_model_lora_Cos_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_path = out_dir / f"lit_model_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
     for i, p_averaged in enumerate(averaged_params):
         trainable_params[i] = p_averaged
-    save_ave_path = out_dir / f"lit_avemodel_lora_Cos_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_ave_path = out_dir / f"lit_avemodel_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
     # save model to huggingface
@@ -257,12 +263,15 @@ def train(
 
     start_averaged = max_iters*0.8
     n_averaged = 0
+
+    print(len(train_data))
     for iter_num in range(max_iters):
-        # if step_count <= warmup_steps:
-        #     # linear warmup
-        #     lr = learning_rate * step_count / warmup_steps
-        #     for param_group in optimizer.param_groups:
-        #         param_group["lr"] = lr
+        if scheduler == "Fix":
+            if step_count <= warmup_steps:
+                # linear warmup
+                lr = learning_rate * step_count / warmup_steps
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = lr
 
         iter_t0 = time.perf_counter()
 
@@ -283,7 +292,8 @@ def train(
             optimizer.zero_grad()
             step_count += 1
             
-            scheduler.step()
+            if not scheduler == "Fix":
+                scheduler.step()
             # if step_count > warmup_steps:
             #     scheduler.step()
             # update Averaged model
