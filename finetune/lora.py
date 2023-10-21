@@ -27,9 +27,11 @@ from lit_gpt.utils import (
     step_csv_logger,
 )
 
-from scripts.prepare_alpaca import generate_prompt
+from script.prepare_alpaca import generate_prompt
 # from scripts import generate_prompt
 from my_utils.utils import get_optimizer, get_bnb_optimizer
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from optimizers import *
 
 eval_interval = 100
 save_interval = 100
@@ -58,8 +60,7 @@ lora_projection = False
 lora_mlp = False
 lora_head = False
 warmup_steps = 100
-
-hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
+eta_min = 0.0
 
 # limit an caching allocator to allocated memory on a CUDA device
 torch.cuda.set_per_process_memory_fraction(0.49, 0)
@@ -72,10 +73,11 @@ def setup(
     quantize: Optional[Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq"]] = None,
     optim_name: str = "AdamW",
     max_iters: int = 50000,
-    log_interval: int = 200,
+    log_interval: int = 50,
     lr: float = 3e-4,
     bs: int = 128
 ):
+    hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
     precision = precision or get_default_supported_precision(training=True)
     
     global learning_rate, batch_size, gradient_accumulation_iters
@@ -163,6 +165,8 @@ def main(
     else:
         optimizer = get_optimizer(optim_name, trainable_params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = fabric.setup_optimizers(optimizer)
+    
+    scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=warmup_steps, max_epochs=max_iters//batch_size, warmup_start_lr=0.00001, eta_min=eta_min)
 
     if not quantize:
         # strict=False because missing keys due to LoRA weights not contained in state dict
@@ -171,7 +175,7 @@ def main(
     fabric.seed_everything(1337 + fabric.global_rank)
 
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, scheduler)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     # fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
@@ -193,7 +197,8 @@ def train(
     out_dir: Path,
     speed_monitor: SpeedMonitor,
     max_iters,
-    log_interval
+    log_interval,
+    scheduler
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
@@ -221,11 +226,11 @@ def train(
     total_t0 = time.perf_counter()
 
     for iter_num in range(max_iters):
-        if step_count <= warmup_steps:
-            # linear warmup
-            lr = learning_rate * step_count / warmup_steps
-            for param_group in optimizer.param_groups:
-                param_group["lr"] = lr
+        # if step_count <= warmup_steps:
+        #     # linear warmup
+        #     lr = learning_rate * step_count / warmup_steps
+        #     for param_group in optimizer.param_groups:
+        #         param_group["lr"] = lr
 
         iter_t0 = time.perf_counter()
 
@@ -245,6 +250,10 @@ def train(
             optimizer.step()
             optimizer.zero_grad()
             step_count += 1
+            
+            scheduler.step()
+            # if step_count > warmup_steps:
+            #     scheduler.step()
 
         t1 = time.perf_counter()
         total_lengths += input_ids.size(1)
@@ -258,7 +267,7 @@ def train(
         )
         if iter_num % log_interval == 0:
             fabric.print(
-                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
+                f"lr: {optimizer.param_groups[0]['lr']:.6f} iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
 
@@ -269,9 +278,9 @@ def train(
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms")
             fabric.barrier()
-        if not is_accumulating and step_count % save_interval == 0:
-            checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
-            save_lora_checkpoint(fabric, model, checkpoint_path)
+        # if not is_accumulating and step_count % save_interval == 0:
+        #     checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
+        #     save_lora_checkpoint(fabric, model, checkpoint_path)
 
 
 @torch.inference_mode()
