@@ -37,19 +37,11 @@ eval_interval = 100
 save_interval = 100
 eval_iters = 100
 eval_max_new_tokens = 100
-# log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
 override_max_seq_length = 2048
 
 # Hyperparameters
-# learning_rate = 3e-4
-# batch_size = 128
-# micro_batch_size = 1
-# gradient_accumulation_iters = batch_size // micro_batch_size
-# assert gradient_accumulation_iters > 0
-# max_iters = 500  # train dataset size
-# weight_decay = 0.01
 # lora_r = 8
 # lora_alpha = 16
 lora_r = 256
@@ -81,7 +73,6 @@ def setup(
     micro_batch_size: int = 1,
     learning_rate: float = 3e-4,
     weight_decay: float = 0.01,
-    save_hf: bool = False,
     lr_type: str = "CosineAnnealingLR"
 ):
     precision = precision or get_default_supported_precision(training=True)
@@ -105,7 +96,7 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, save_hf, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, quantize)
 
 
 def main(
@@ -116,7 +107,6 @@ def main(
         max_iters,
         optim_name,
         log_interval,
-        save_hf,
         batch_size,
         micro_batch_size,
         learning_rate,
@@ -202,23 +192,6 @@ def main(
     save_ave_path = out_dir / f"lit_avemodel_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
-    # save model to huggingface
-    if save_hf is True:
-        from huggingface_hub import login, HfApi
-        os.environ["HUGGINGFACE_TOKEN"] = "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"
-        os.environ["HUGGINGFACE_REPO"] = "yshr-926/test_model2"
-        login(token=os.getenv("HUGGINGFACE_TOKEN"))
-        
-        api = HfApi()
-
-        api.upload_folder(
-            folder_path= out_dir,
-            repo_id=os.environ["HUGGINGFACE_REPO"], 
-            repo_type='model', 
-            )
-    
-
-
 def train(
     fabric: L.Fabric,
     model: GPT,
@@ -266,7 +239,6 @@ def train(
     start_averaged = max_iters*0.8
     n_averaged = 0
 
-    # print(len(train_data))
     for iter_num in range(max_iters):
         if scheduler == "Fix":
             if step_count <= warmup_steps:
@@ -296,8 +268,7 @@ def train(
             
             if not scheduler == "Fix":
                 scheduler.step()
-            # if step_count > warmup_steps:
-            #     scheduler.step()
+
             # update Averaged model
             if iter_num >= start_averaged:
                 update_parameters(averaged_params, trainable_params, n_averaged)
