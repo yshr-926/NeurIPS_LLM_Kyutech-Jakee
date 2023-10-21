@@ -33,8 +33,8 @@ from my_utils.utils import get_optimizer, get_bnb_optimizer
 from copy import deepcopy
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optimizers import *
-eval_interval = 1
-save_interval = 1
+eval_interval = 100
+save_interval = 100
 eval_iters = 100
 eval_max_new_tokens = 100
 devices = 1
