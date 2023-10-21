@@ -50,15 +50,17 @@ override_max_seq_length = 2048
 # assert gradient_accumulation_iters > 0
 # max_iters = 500  # train dataset size
 # weight_decay = 0.01
-lora_r = 8
-lora_alpha = 16
+# lora_r = 8
+# lora_alpha = 16
+lora_r = 256
+lora_alpha = 512
 lora_dropout = 0.05
 lora_query = True
-lora_key = False
+lora_key = True
 lora_value = True
-lora_projection = False
-lora_mlp = False
-lora_head = False
+lora_projection = True
+lora_mlp = True
+lora_head = True
 warmup_steps = 100
 eta_min = 0.0
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
@@ -264,7 +266,7 @@ def train(
     start_averaged = max_iters*0.8
     n_averaged = 0
 
-    print(len(train_data))
+    # print(len(train_data))
     for iter_num in range(max_iters):
         if scheduler == "Fix":
             if step_count <= warmup_steps:
@@ -323,9 +325,9 @@ def train(
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms")
             fabric.barrier()
-        # if not is_accumulating and step_count % save_interval == 0:
-        #     checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
-        #     save_lora_checkpoint(fabric, model, checkpoint_path)
+        if not is_accumulating and step_count % save_interval == 0:
+            checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
+            save_lora_checkpoint(fabric, model, checkpoint_path)
 
 
 @torch.inference_mode()
