@@ -33,8 +33,8 @@ from my_utils.utils import get_optimizer, get_bnb_optimizer
 from copy import deepcopy
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optimizers import *
-eval_interval = 100
-save_interval = 100
+eval_interval = 1
+save_interval = 1
 eval_iters = 100
 eval_max_new_tokens = 100
 devices = 1
@@ -176,8 +176,9 @@ def main(
 
     fabric.seed_everything(1337 + fabric.global_rank)
 
+    iter_checkpoint_path = f"{max_iters}_{learning_rate}_{weight_decay}_{lr_type}"
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler, iter_checkpoint_path)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     if fabric.device.type == "cuda":
@@ -208,7 +209,8 @@ def train(
     learning_rate,
     trainable_params,
     averaged_params,
-    scheduler
+    scheduler,
+    iter_checkpoint_path
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
@@ -238,6 +240,7 @@ def train(
 
     start_averaged = max_iters*0.8
     n_averaged = 0
+    best_val = {"iter": 0, "val_loss": 1000}
 
     for iter_num in range(max_iters):
         if scheduler == "Fix":
@@ -294,11 +297,17 @@ def train(
             val_loss = validate(fabric, model, val_data, tokenizer, micro_batch_size, longest_seq_length)
             t1 = time.perf_counter() - t0
             speed_monitor.eval_end(t1)
+            if best_val['val_loss'] > val_loss.item():
+                best_val['iter'] = iter_num
+                best_val['val_loss'] = val_loss.item()
             fabric.print(f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms")
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
-            checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
+            checkpoint_path = out_dir / f"iter-{iter_num:06d}-{iter_checkpoint_path}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
+    
+    # print best val iter
+    fabric.print(f"best_val iter: {best_val['iter']}  loss: {best_val['val_loss']}")
 
 
 @torch.inference_mode()
