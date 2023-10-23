@@ -22,9 +22,9 @@ from lit_gpt.tokenizer import Tokenizer
 """
 python3 script/prepare_customdata.py \
     --checkpoint_dir "checkpoints/meta-llama/Llama-2-7b-hf" \
-    --destination_path data/limadolly-Llama-2-7b-hf \
+    --destination_path data/limaopenbookqasciq-Llama-2-7b-hf \
     --access_token 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 \
-    --datasetlist "['lima', 'dolly']" \
+    --datasetlist "['lima', 'openbookqa', 'sciq']" \
     --max_seq_length 2048
 
 ['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq']
@@ -478,7 +478,7 @@ def format_dataset_sciq(dataset_partition, include_multi_turn_conversations):
         else:
             formatted_ds.append({"instruction": entry["question"], "input": ', '.join(choices), "output": entry["correct_answer"]})
         
-        return formatted_ds
+    return formatted_ds
 
 
 if __name__ == "__main__":
