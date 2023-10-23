@@ -100,8 +100,6 @@ def prepare(
 
 def format_dataset(dataset_partition, include_multi_turn_conversations):
     formatted_ds = []
-    
-    i = 0
 
     for entry in dataset_partition:
         convo = entry["question"]
