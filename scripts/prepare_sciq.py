@@ -115,8 +115,7 @@ def format_dataset(dataset_partition, include_multi_turn_conversations):
         else:
             formatted_ds.append({"instruction": entry["question"], "input": ', '.join(choices), "output": entry["correct_answer"]})
         
-        sys.exit()
-    return formatted_ds
+        return formatted_ds
 
 
 def prepare_sample(example: dict, tokenizer: Tokenizer, max_length: int, mask_inputs: bool, ignore_index: int):
