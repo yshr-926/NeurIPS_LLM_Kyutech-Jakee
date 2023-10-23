@@ -20,7 +20,7 @@ from lit_gpt.tokenizer import Tokenizer
 python3 script/prepare_sciq.py \
     --checkpoint_dir "checkpoints/meta-llama/Llama-2-7b-hf" \
     --destination_path data/sciq-Llama-2-7b-hf \
-    --max_seq_length 2048
+    # --max_seq_length 2048
 """
 
 def prepare(
@@ -115,7 +115,6 @@ def format_dataset(dataset_partition, include_multi_turn_conversations):
         else:
             formatted_ds.append({"instruction": entry["question"], "input": ', '.join(choices), "output": entry["correct_answer"]})
         
-        sys.exit()
     return formatted_ds
 
 
