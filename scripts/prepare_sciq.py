@@ -104,10 +104,10 @@ def format_dataset(dataset_partition, include_multi_turn_conversations):
     for entry in dataset_partition:
         convo = entry["question"]
         choices = []
-        choices.append(entry["distractor1"])
-        choices.append(entry["distractor2"])
-        choices.append(entry["distractor3"])
-        choices.append(entry["correct_answer"])
+        choices.append("'" + entry["distractor1"] + "'")
+        choices.append("'" + entry["distractor2"] + "'")
+        choices.append("'" + entry["distractor3"] + "'")
+        choices.append("'" + entry["correct_answer"] + "'")
         random.shuffle(choices)
         if include_multi_turn_conversations:
             for i in range(0, len(convo) - 1, 2):
