@@ -27,7 +27,7 @@ python3 script/prepare_customdata.py \
     --datasetlist "['lima', 'dolly']" \
     --max_seq_length 2048
 
-['dolly', 'lima', 'oasst1', 'flan', 'openbookqa', 'sciq']
+['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq']
 """
 
 
@@ -113,7 +113,7 @@ def prepare(
     access_token: Optional[str] = os.getenv("HF_TOKEN"),
     max_seq_length: Optional[int] = None,
     shuffle: bool = False,
-    datasetlist: List[str] = ['dolly', 'lima', 'oasst1', 'flan', 'openbookqa', 'sciq']
+    datasetlist: List[str] = ['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq']
 ) -> None:
 
     if access_token is None:
