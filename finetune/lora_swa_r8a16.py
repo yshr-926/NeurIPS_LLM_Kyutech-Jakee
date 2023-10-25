@@ -33,7 +33,7 @@ from my_utils.utils import get_optimizer, get_bnb_optimizer
 from copy import deepcopy
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optimizers import *
-eval_interval = 100
+eval_interval = 50
 save_interval = 100
 eval_iters = 100
 eval_max_new_tokens = 100
@@ -51,7 +51,7 @@ lora_value = True
 lora_projection = False
 lora_mlp = False
 lora_head = False
-warmup_steps = 100
+# warmup_steps = 10
 eta_min = 0.0
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 
@@ -71,6 +71,7 @@ def setup(
     micro_batch_size: int = 1,
     learning_rate: float = 3e-4,
     weight_decay: float = 0.01,
+    warmup_steps: int = 10,
     lr_type: str = "CosineAnnealingLR"
 ):
     precision = precision or get_default_supported_precision(training=True)
@@ -94,7 +95,7 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, quantize)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, warmup_steps, quantize)
 
 
 def main(
@@ -110,6 +111,7 @@ def main(
         learning_rate,
         weight_decay,
         lr_type,
+        warmup_steps,
         quantize: Optional[str] = None,
         ):
     check_valid_checkpoint_dir(checkpoint_dir)
@@ -176,19 +178,19 @@ def main(
 
     iter_checkpoint_path = f"{max_iters}_{learning_rate}_{weight_decay}_{lr_type}"
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler, iter_checkpoint_path)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler, warmup_steps, iter_checkpoint_path)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / f"lit_model_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_path = out_dir / f"lit_model_lora_{lr_type}_{optim_name}_{max_iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
     for i, p_averaged in enumerate(averaged_params):
         trainable_params[i] = p_averaged
-    save_ave_path = out_dir / f"lit_avemodel_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_ave_path = out_dir / f"lit_model_ave_{lr_type}_{optim_name}_{max_iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
 def train(
@@ -208,6 +210,7 @@ def train(
     trainable_params,
     averaged_params,
     scheduler,
+    warmup_steps,
     iter_checkpoint_path
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
