@@ -21,11 +21,12 @@ from lit_gpt.tokenizer import Tokenizer
 
 """
 python3 script/prepare_customdata.py \
-    --checkpoint_dir "checkpoints/meta-llama/Llama-2-7b-hf" \
-    --destination_path data/limaopenbookqasciq-Llama-2-7b-hf \
+    --checkpoint_dir "checkpoints/meta-llama/Llama-2-13b-hf" \
+    --destination_path data/test \
     --access_token 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 \
-    --datasetlist "['lima', 'openbookqa', 'sciq']" \
-    --max_seq_length 2048
+    --datasetlist "['lima', 'oasst']" \
+    --max_seq_length 2048 \
+    --submission true
 
 ['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq']
 """
@@ -113,7 +114,8 @@ def prepare(
     access_token: Optional[str] = os.getenv("HF_TOKEN"),
     max_seq_length: Optional[int] = None,
     shuffle: bool = False,
-    datasetlist: List[str] = ['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq']
+    datasetlist: List[str] = ['dolly', 'lima', 'oasst', 'flan', 'openbookqa', 'sciq'],
+    submission: bool = False
 ) -> None:
 
     if access_token is None:
@@ -149,6 +151,9 @@ def prepare(
     tokenizer = Tokenizer(checkpoint_dir)
 
     train_set, test_set = list(train_set), list(test_set)
+    
+    if submission:
+        train_set += test_set
 
     print(f"train has {len(train_set):,} samples")
     print(f"test has {len(test_set):,} samples")
@@ -452,7 +457,9 @@ def format_dataset_openbookqa(dataset_partition, include_multi_turn_conversation
                 formatted_ds.append({"instruction": convo[i], "input": "", "output": convo[i + 1]})
         else:
             formatted_ds.append({"instruction": entry["question_stem"], "input": ', '.join(choices_list), "output": choices["text"][d[entry["answerKey"]]]})
+        
     return formatted_ds
+
 
 # sciq
 def prepare_sciq(data_file_path, data_file_url, test_split_fraction, seed, access_token, include_multiturn_conversations):
