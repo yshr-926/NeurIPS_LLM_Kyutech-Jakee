@@ -22,7 +22,7 @@ from lit_gpt.tokenizer import Tokenizer
 """
 python3 script/prepare_customdata.py \
     --checkpoint_dir "checkpoints/meta-llama/Llama-2-13b-hf" \
-    --destination_path data/test \
+    --destination_path data/submission-limaoasst-Llama-2-13b-hf \
     --access_token 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 \
     --datasetlist "['lima', 'oasst']" \
     --max_seq_length 2048 \

@@ -1,5 +1,7 @@
-models=('Llama-2-7b-hf')
-datasets=('limadolly')
+base='pythia'
+models=('pythia-12b')
+# 'pythia-12b' 'pythia-6.9b' 'pythia-2.8b' 'pythia-1.4b' 'pythia-1b' 'pythia-410m' 'pythia-160m' 'pythia-70m'
+datasets=('lima')
 finetunes=('lora')
 optimizers=('AdamW')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
@@ -18,8 +20,8 @@ do
             do
                 mkdir -p logs/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today &&
                 python finetune/$finetune.py \
-                --data_dir data/$dataset-$model \
-                --checkpoint_dir checkpoints/meta-llama/$model \
+                --data_dir data/$base/$model/$dataset \
+                --checkpoint_dir checkpoints/EleutherAI/$model \
                 --out_dir out/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$today \
                 --precision "bf16-true" \
                 --optim_name $optimizer \
@@ -30,4 +32,4 @@ do
     done
 done
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh >sh_logs/llama_openbookqa.log 2>sh_logs/error_llama_openbookqa.log &
+# CUDA_VISIBLE_DEVICES=7 nohup bash sh/pythia.sh >sh_logs/pythia.log 2>sh_logs/error_pythia.log &

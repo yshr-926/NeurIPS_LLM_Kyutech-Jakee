@@ -1,12 +1,12 @@
-models=('Llama-2-7b-hf')
-datasets=('dolly' 'lima')
-finetunes=('lora')
-quantizes=('bnb.nf4' 'bnb.nf4-dq')
-optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion')
+models=('Llama-2-13b-hf')
+datasets=('lima')
+finetunes=('lora_swa_r8a16')
+quantizes=('bnb.nf4-dq')
+optimizers=('AdamW')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
-max_iters=50000
+max_iters=10000
 
 for dataset in ${datasets[@]}
 do

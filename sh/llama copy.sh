@@ -1,12 +1,12 @@
 models=('Llama-2-7b-hf')
-datasets=('limadolly')
-finetunes=('lora')
-optimizers=('AdamW')
+datasets=('dolly' 'lima')
+finetunes=('lora' 'lora_sam')
+optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
 quantize='not_quantize'
-max_iters=1000
+max_iters=50000
 
 for dataset in ${datasets[@]}
 do
@@ -30,4 +30,4 @@ do
     done
 done
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh >sh_logs/llama_openbookqa.log 2>sh_logs/error_llama_openbookqa.log &
+# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh >sh_logs/llama.log 2>sh_logs/error_llama.log &
