@@ -16,6 +16,10 @@ def get_optimizer(optim_name, model_parm, lr, weight_decay):
         optimizer = LAMB(model_parm, lr=lr, weight_decay=weight_decay)
     elif optim_name == 'Lion':
         optimizer = Lion(model_parm, lr=lr, weight_decay=weight_decay)
+    elif optim_name == 'SAM2':
+        optimizer = SAM2(model_parm, base_optimizer=optim.SGD, lr=lr, weight_decay=weight_decay)
+    elif optim_name == 'SGDm':
+        optimizer = optim.SGD(model_parm, lr=lr, momentum=0.9, weight_decay=weight_decay)
     return optimizer
 
 def get_bnb_optimizer(optim_name, model_parm, lr, weight_decay):

@@ -2,11 +2,11 @@ models=('Llama-2-7b-hf')
 datasets=('dolly' 'lima')
 finetunes=('lora')
 quantizes=('bnb.nf4' 'bnb.nf4-dq')
-optimizers=('AdamW' 'SGD' 'LARS' 'LAMB' 'Lion')
+optimizers=('AdamW' 'SGD' 'Lion')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
-max_iters=50000
+max_iters=200000
 
 for dataset in ${datasets[@]}
 do
@@ -35,4 +35,4 @@ do
 done
 
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=0 nohup bash sh/llama.sh >sh_logs/llama.log 2>sh_logs/error_llama.log &
+# CUDA_VISIBLE_DEVICES=1 nohup bash sh/llama_quantize.sh &

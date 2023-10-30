@@ -1,18 +1,18 @@
 models=('Llama-2-13b-hf')
-datasets=('all')
+datasets=('limaoasstopenbookqa')
 finetunes=('lora_swa_r8a16')
 optimizers=('AdamW')
 today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
 quantize='bnb.nf4-dq'
-max_iters=('100000')
+max_iters=('100000' '30000')
 
 # batch_sizes=('16')
-# batch_sizes=('64')
+# batch_sizes=('32')
 batch_sizes=('128')
 micro_batch_sizes=('1')
-learning_rates=('0.0003')
+learning_rates=('0.0008')
 weight_decays=('0.01')
 lr_types=('CosineAnnealingLR')
 # lr_types=('Fix')

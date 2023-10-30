@@ -11,16 +11,16 @@ login(token=os.getenv("HUGGINGFACE_TOKEN"))
 api = HfApi()
 
 for model in ["Llama-2-13b-hf"]:
-    for dataset in ['limaoasstopenbookqasciq']:
+    for dataset in ['dollylimaoasstopenbookqa']:
         for finetune in ["lora_swa_r8a16"]:
             for optimizer in ["AdamW"]:
                 for quantize in ["bnb.nf4-dq"]:
-                    for date in ["2023-10-25"]:
+                    for date in ["2023-10-26"]:
                         for max_iter in ['30000', '100000']:
                             for batch_size in [128]:
                                 for micro_batch_size in [1]:
                                     for learning_rate in ['0.0008']:
-                                        for weight_decay in ['0.001']:
+                                        for weight_decay in ['0.01']:
                                             for lr_type in ['CosineAnnealingLR']:
                                                 repo = f"yshr-926/{model}_{dataset}_{optimizer}_{max_iter}_{batch_size}_{learning_rate}_{weight_decay}_{lr_type}"
                                                 create_repo(repo, exist_ok=True)

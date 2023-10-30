@@ -1,9 +1,9 @@
 models=('open_llama_3b' 'open_llama_7b')
-datasets=('dolly' 'lima')
+datasets=("flan")
 
 for model in ${models[@]}
 do
-    python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/openlm-research/$model &&
+    # python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/openlm-research/$model &&
     for dataset in ${datasets[@]}
     do
         if [ $dataset = 'dolly' ]; then

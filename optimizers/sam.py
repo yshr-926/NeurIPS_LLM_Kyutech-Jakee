@@ -89,7 +89,7 @@ class SAM2(torch.optim.Optimizer):
                     p.mul_(1-lr*weight_decay)
 
     @torch.no_grad()
-    def steps(self, initial_step=False, zero_grad=False):
+    def steps(self, initial_step=False):
         for group in self.param_groups:
             momentum = group["momentum"]            
             lr = group["lr"]
@@ -111,4 +111,4 @@ class SAM2(torch.optim.Optimizer):
                 p.add_(d_p, alpha=-lr)
 
         self.save_grad()
-        if zero_grad: self.zero_grad()                
+        # if zero_grad: self.zero_grad()                
