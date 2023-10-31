@@ -1,6 +1,7 @@
 """Implementation derived from https://github.com/tloen/alpaca-lora"""
 import json
 import sys
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -24,6 +25,7 @@ def prepare(
     mask_inputs: bool = False,
     data_file_name: str = "dolly_data_cleaned.json",
     data_file_url: str = "https://huggingface.co/datasets/databricks/databricks-dolly-15k/resolve/main/databricks-dolly-15k.jsonl",
+    access_token: Optional[str] = os.getenv("HF_TOKEN"),
     ignore_index: int = -1,
     max_seq_length: Optional[int] = None,
 ) -> None:
