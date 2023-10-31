@@ -6,7 +6,7 @@ today=$(TZ=JST-9 date "+%Y-%m-%d")
 time=$(TZ=JST-9 date "+%H%M")
 
 quantize='bnb.nf4-dq'
-max_iters=('50000')
+max_iters=('500')
 
 # batch_sizes=('16')
 # batch_sizes=('64')
@@ -68,3 +68,4 @@ done
 
 ### 実行するとき
 # CUDA_VISIBLE_DEVICES=3 nohup bash sh/llama_swa_r8a16_quantize.sh >sh_logs/llima_swa_r8a16_quantize_0910.log 2>sh_logs/error_swa_r8a16_quantize_0910.log &
+# CUDA_VISIBLE_DEVICES=3 bash sh/llama_swa_r8a16_quantize.sh
