@@ -10,6 +10,7 @@ MY_TOKEN="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"
 
 # falcon, pythia, llama, open-llama
 base="open-llama"
+
 # falcon
 # models=("falcon-7b" "falcon-40b" "falcon-180B")
 # pythia
@@ -19,6 +20,7 @@ base="open-llama"
 # open-llama
 # models=("open_llama_3b" "open_llama_7b" "open_llama_13b")
 models=("open_llama_3b")
+
 # datasets=("dolly" "lima" "flan" "oasst1" "openbookqa" "sciq")
 datasets=("dolly" "lima")
 
@@ -40,16 +42,19 @@ do
             python script/download.py \
                 --repo_id ${CHECKPOINT_DIR["${base}"]}/$model
         fi
-        python scripts/convert_hf_checkpoint.py \
+        python script/convert_hf_checkpoint.py \
             --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model
     fi
 
     # prepare dataset
     for dataset in ${datasets[@]}
     do
-        python scripts/prepare_$dataset.py \
+        python script/prepare_$dataset.py \
             --checkpoint_dir checkpoints/openlm-research/$model \
             --destination_path data/$base/$model/$dataset \
             --access_token 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
     done
 done
+
+# usage
+# nohup bash sh/prepare_model_dataset.sh &
