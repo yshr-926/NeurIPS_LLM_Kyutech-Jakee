@@ -28,6 +28,7 @@ for model in ${models[@]}
 do
     # prepare model
     if [ ! -d checkpoints/${CHECKPOINT_DIR["${base}"]}/$model ]; then
+        echo start download model "==>" $model
         mkdir -p checkpoints/${CHECKPOINT_DIR["${base}"]}/$model
         if [ $base = "llama" ]; then
             python script/download.py \
@@ -42,6 +43,7 @@ do
             python script/download.py \
                 --repo_id ${CHECKPOINT_DIR["${base}"]}/$model
         fi
+        echo start convert checkpoint "==>" $model
         python script/convert_hf_checkpoint.py \
             --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model
     fi
@@ -49,12 +51,13 @@ do
     # prepare dataset
     for dataset in ${datasets[@]}
     do
+        echo start download dataset "==>" $model/$dataset
         python script/prepare_$dataset.py \
-            --checkpoint_dir checkpoints/openlm-research/$model \
+            --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model \
             --destination_path data/$base/$model/$dataset \
             --access_token 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
     done
 done
 
-# usage
+### usage
 # nohup bash sh/prepare_model_dataset.sh &

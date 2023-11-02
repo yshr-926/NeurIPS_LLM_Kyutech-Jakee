@@ -14,8 +14,8 @@ batch_sizes=('128')
 micro_batch_sizes=('1')
 learning_rates=('0.0003')
 weight_decays=('0.001')
-# lr_types=('CosineAnnealingLR')
-lr_types=('Fix')
+lr_types=('CosineAnnealingLR')
+# lr_types=('Fix' 'LinearWarmupCosineAnnealingLR')
 warmup_steps='100'
 
 for dataset in ${datasets[@]}
@@ -67,5 +67,5 @@ do
 done
 
 ### 実行するとき
-# CUDA_VISIBLE_DEVICES=3 nohup bash sh/llama_swa_r8a16_quantize.sh >sh_logs/llima_swa_r8a16_quantize_0910.log 2>sh_logs/error_swa_r8a16_quantize_0910.log &
+# CUDA_VISIBLE_DEVICES=3 nohup bash sh/llama_swa_r8a16_quantize.sh > sh_logs/llima_swa_r8a16_quantize_0910.log 2>sh_logs/error_swa_r8a16_quantize_0910.log &
 # CUDA_VISIBLE_DEVICES=3 bash sh/llama_swa_r8a16_quantize.sh

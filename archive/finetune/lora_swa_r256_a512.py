@@ -27,25 +27,34 @@ from lit_gpt.utils import (
     step_csv_logger,
 )
 from script.prepare_alpaca import generate_prompt
+# from scripts import generate_prompt
 from my_utils.utils import get_optimizer, get_bnb_optimizer
+# from torch.optim.swa_utils import AveragedModel
 from copy import deepcopy
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optimizers import *
-
-# train 
-eval_interval = 50
+eval_interval = 100
 save_interval = 100
-# validate
 eval_iters = 100
 eval_max_new_tokens = 100
-# 色々
 devices = 1
 # change this value to force a maximum sequence length
-# get max seq 
 override_max_seq_length = 2048
-# main 
+
+# Hyperparameters
+# lora_r = 8
+# lora_alpha = 16
+lora_r = 256
+lora_alpha = 512
+lora_dropout = 0.05
+lora_query = True
+lora_key = True
+lora_value = True
+lora_projection = True
+lora_mlp = True
+lora_head = True
+warmup_steps = 100
 eta_min = 0.0
-# TODO ハイパラの表示をどうにかする
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 
 # limit an caching allocator to allocated memory on a CUDA device
@@ -59,22 +68,12 @@ def setup(
     quantize: Optional[Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq"]] = None,
     optim_name: str = "AdamW",
     max_iters: int = 50000,
-    log_interval: int = 200,
+    log_interval: int = 1,
     batch_size: int = 128,
     micro_batch_size: int = 1,
     learning_rate: float = 3e-4,
     weight_decay: float = 0.01,
-    warmup_steps: int = 10,
-    lr_type: str = "CosineAnnealingLR",
-    lora_r: int = 8,
-    lora_alpha: int = 16,
-    lora_dropout: float = 0.05,
-    lora_query: bool = True,
-    lora_key: bool = False,
-    lora_value: bool = True,
-    lora_projection: bool = False,
-    lora_mlp: bool = False,
-    lora_head: bool = False
+    lr_type: str = "CosineAnnealingLR"
 ):
     precision = precision or get_default_supported_precision(training=True)
 
@@ -97,30 +96,7 @@ def setup(
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
     fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
     fabric.print(hparams)
-    fabric.launch(
-        main, 
-        data_dir, 
-        checkpoint_dir, 
-        out_dir, 
-        quantize, 
-        optim_name, 
-        max_iters, 
-        log_interval, 
-        batch_size, 
-        micro_batch_size, 
-        learning_rate, 
-        weight_decay, 
-        warmup_steps, 
-        lr_type, lora_r, 
-        lora_alpha,
-        lora_dropout,
-        lora_query,
-        lora_key,
-        lora_value,
-        lora_projection,
-        lora_mlp,
-        lora_head
-        )
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, max_iters, optim_name, log_interval, batch_size, micro_batch_size, learning_rate, weight_decay, lr_type, quantize)
 
 
 def main(
@@ -128,25 +104,15 @@ def main(
         data_dir: Path, 
         checkpoint_dir: Path, 
         out_dir: Path,
-        quantize: Optional[str],
-        optim_name: str,
-        max_iters: int,
-        log_interval: int,
-        batch_size: int,
-        micro_batch_size: int,
-        learning_rate: float,
-        weight_decay: float,
-        warmup_steps: int,
-        lr_type: str,
-        lora_r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        lora_query: bool,
-        lora_key: bool,
-        lora_value: bool,
-        lora_projection: bool,
-        lora_mlp: bool,
-        lora_head: bool
+        max_iters,
+        optim_name,
+        log_interval,
+        batch_size,
+        micro_batch_size,
+        learning_rate,
+        weight_decay,
+        lr_type,
+        quantize: Optional[str] = None,
         ):
     check_valid_checkpoint_dir(checkpoint_dir)
 
@@ -201,7 +167,6 @@ def main(
     # scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=max_iters//batch_size, eta_min=eta_min)
     if lr_type == "CosineAnnealingLR":
         scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=warmup_steps, max_epochs=max_iters//batch_size, warmup_start_lr=0.00001, eta_min=eta_min)
-        # scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=max_iters//batch_size, eta_min=eta_min)  
     else:
         scheduler = "Fix"
     
@@ -213,19 +178,19 @@ def main(
 
     iter_checkpoint_path = f"{max_iters}_{learning_rate}_{weight_decay}_{lr_type}"
     train_time = time.perf_counter()
-    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler, warmup_steps, iter_checkpoint_path)
+    train(fabric, model, optimizer, train_data, val_data, checkpoint_dir, out_dir, speed_monitor, max_iters, log_interval, batch_size, micro_batch_size, learning_rate, trainable_params, averaged_params, scheduler, iter_checkpoint_path)
     total_time = time.perf_counter()-train_time
     fabric.print(f'Total {total_time//3600:.0f}:{total_time%3600//60:02.0f}:{total_time%3600%60:02.0f}')
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
     # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / f"lit_model_lora_{lr_type}_{optim_name}_{max_iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_path = out_dir / f"lit_model_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_path)
 
     for i, p_averaged in enumerate(averaged_params):
         trainable_params[i] = p_averaged
-    save_ave_path = out_dir / f"lit_model_ave_{lr_type}_{optim_name}_{max_iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
+    save_ave_path = out_dir / f"lit_avemodel_lora_{lr_type}_{optim_name}_finetuned_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}.pth"
     save_lora_checkpoint(fabric, model, save_ave_path)
 
 def train(
@@ -245,7 +210,6 @@ def train(
     trainable_params,
     averaged_params,
     scheduler,
-    warmup_steps,
     iter_checkpoint_path
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
