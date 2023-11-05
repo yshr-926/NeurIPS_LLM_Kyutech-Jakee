@@ -70,7 +70,7 @@ do
                                         python finetune/$finetune.py \
                                             --data_dir data/$base/$model/$dataset \
                                             --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model \
-                                            --out_dir out/$model/$dataset/"$finetune"_"$optimizer"/$quantize/$lr_type/$today \
+                                            --out_dir out/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today" \
                                             --precision "bf16-true" \
                                             --quantize $quantize \
                                             --optim_name $optimizer \
