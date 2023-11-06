@@ -6,10 +6,12 @@ declare -A CHECKPOINT_DIR=(
     ["llama"]="meta-llama"
     ["open-llama"]="openlm-research"
 )
+""
+# huggingface token "read"
 MY_TOKEN="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"
 
 # falcon, pythia, llama, open-llama
-base="open-llama"
+base="pythia"
 
 # falcon
 # models=("falcon-7b" "falcon-40b" "falcon-180B")
@@ -19,10 +21,11 @@ base="open-llama"
 # models=("Llama-2-7b-hf" "Llama-2-13b-hf" "Llama-2-70b-hf")
 # open-llama
 # models=("open_llama_3b" "open_llama_7b" "open_llama_13b")
-models=("open_llama_3b")
+models=("pythia-70m")
 
 # datasets=("dolly" "lima" "flan" "oasst1" "openbookqa" "sciq")
 datasets=("dolly" "lima")
+max_seq_length=2048
 
 for model in ${models[@]}
 do
@@ -51,13 +54,16 @@ do
     # prepare dataset
     for dataset in ${datasets[@]}
     do
-        echo start download dataset "==>" $model/$dataset
-        python script/prepare_$dataset.py \
-            --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model \
-            --destination_path data/$base/$model/$dataset \
-            --access_token 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
+        if [ ! -d data/$base/$model/$dataset ]; then
+            echo start download dataset "==>" $model/$dataset
+            python script/prepare_$dataset.py \
+                --checkpoint_dir checkpoints/${CHECKPOINT_DIR["${base}"]}/$model \
+                --destination_path data/$base/$model/$dataset \
+                --access_token $MY_TOKEN \
+                --max_seq_length $max_seq_length
+        fi
     done
 done
 
 ### usage
-# nohup bash sh/prepare_model_dataset.sh &
+# nohup bash sh/prepare_model_dataset.sh > sh_logs/prepare_model_dataset.log 2> sh_logs/error_prepare_model_dataset.log &
