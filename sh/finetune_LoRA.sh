@@ -45,6 +45,10 @@ save_interval='100'
 eval_iters='100'
 eval_max_new_tokens='100'
 
+upload_flag=true
+# huggingface token "write"
+hf_token='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'
+repo_dir='miz22'
 
 for dataset in ${datasets[@]}
 do
@@ -97,6 +101,26 @@ do
                                             --eval_iters $eval_iters \
                                             --eval_max_new_tokens $eval_max_new_tokens \
                                         > logs/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today"_"$time".log
+                                        if [ -e out/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today"/lit_model_*.pth ] && $upload_flag; then
+                                            python script/hf_upload.py \
+                                                --hf_token $hf_token \
+                                                --repo_dir $repo_dir \
+                                                --base $base \
+                                                --model $model \
+                                                --dataset $dataset \
+                                                --finetune $finetune \
+                                                --r $lora_r \
+                                                --alpha $lora_alpha \
+                                                --optimizer $optimizer \
+                                                --quantize $quantize \
+                                                --iter $max_iter \
+                                                --batch_size $batch_size \
+                                                --micro_batch_size $micro_batch_size \
+                                                --learning_rate $learning_rate \
+                                                --weight_decay $weight_decay \
+                                                --scheduler $lr_type \
+                                                --date $today
+                                        fi
                                     done
                                 done
                             done
