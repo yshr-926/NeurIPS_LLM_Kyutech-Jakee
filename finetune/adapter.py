@@ -25,7 +25,7 @@ from lit_gpt.utils import (
     num_parameters,
     step_csv_logger,
 )
-from scripts.prepare_alpaca import generate_prompt
+from script.prepare_alpaca import generate_prompt
 
 eval_interval = 600
 save_interval = 1000

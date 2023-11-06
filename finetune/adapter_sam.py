@@ -25,7 +25,7 @@ from lit_gpt.utils import (
     num_parameters,
     step_csv_logger,
 )
-from scripts.prepare_alpaca import generate_prompt
+from script.prepare_alpaca import generate_prompt
 
 from my_utils.utils_sum import enable_running_stats, disable_running_stats
 from optimizers import *
