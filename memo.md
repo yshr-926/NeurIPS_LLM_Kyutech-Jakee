@@ -527,8 +527,8 @@ data/{model}/{model_size}/{dataset}
 out dir
 {model}/{model_size}/{dataset}/{method}_{r8}{a16}/{quantize}/{optimizer}/{iters}_{batch_size}_{micro_batch_size}/{learning_rate}_{weight_decay}/{scheduler}/{date}
 
-LoRA path 
+LoRA path
 lit_model_{ave|nonave}_lora_{optimizer}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}.pth
 
 huggingface repo
-{repo_id}/{model}_{dataset}_{optimizer}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}_{date}
+{repo_id}/{model}_{dataset}_{optimizer}_{quantize}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}_{date}
