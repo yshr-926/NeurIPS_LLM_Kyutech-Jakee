@@ -3,23 +3,23 @@ import os
 
 
 def upload(
-    hf_token: str,
-    repo_dir: str,
-    base: str,
-    model: str,
-    dataset: str,
-    finetune: str,
-    r: str,
-    alpha: str,
-    optimizer: str,
-    quantize: str,
-    iter: str,
-    batch_size: str,
-    micro_batch_size: str,
-    learning_rate: str,
-    weight_decay: str,
-    scheduler: str,
-    date: str
+    hf_token: str = None,
+    repo_dir: str = None,
+    base: str = None,
+    model: str = None,
+    dataset: str = None,
+    finetune: str = None,
+    r: str = None,
+    alpha: str = None,
+    optimizer: str = None,
+    quantize: str = None,
+    iter: str = None,
+    batch_size: str = None,
+    micro_batch_size: str = None,
+    learning_rate: str = None,
+    weight_decay: str = None,
+    scheduler: str = None,
+    date: str = None
 ) -> None:
     # huggingface token "write"
     os.environ["HUGGINGFACE_TOKEN"] = hf_token
@@ -27,7 +27,7 @@ def upload(
 
     api = HfApi()
 
-    repo = f"{repo_dir}/{model}_{dataset}_{finetune}_{optimizer}_{quantize}_{iter}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}_{date}"
+    repo = f"{repo_dir}/{model}_{dataset}_{finetune}_{optimizer}_{quantize}_{iter}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{date}"
     # リポジトリ作成
     create_repo(repo, exist_ok=False)
     #モデルがあるディレクトリ

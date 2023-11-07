@@ -23,8 +23,8 @@ batch_sizes=('128')
 micro_batch_sizes=('1')
 learning_rates=('0.0003')
 weight_decays=('0.001')
-# lr_types=('LinearWarmupCosineAnnealingLR' 'CosineAnnealingLR')
-lr_types=('Fix')
+# lr_types=('Fix' 'LinearWarmupCosineAnnealingLR' 'CosineAnnealingLR')
+lr_types=('LinearWarmupCosineAnnealingLR')
 warmup_steps='100'
 eta_min='0.0'
 
@@ -101,7 +101,7 @@ do
                                             --eval_iters $eval_iters \
                                             --eval_max_new_tokens $eval_max_new_tokens \
                                         > logs/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today"_"$time".log
-                                        if [ -e out/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today"/lit_model_*.pth ] && $upload_flag; then
+                                        if find out/$base/$model/$dataset/"$finetune"_r"$lora_r"a"$lora_alpha"/$quantize/"$optimizer"/"$max_iter"_"$batch_size"_"$micro_batch_size"/"$learning_rate"_"$weight_decay"/"$lr_type"/"$today" -type f -name "lit_model_*.pth" | grep -q "." && $upload_flag; then
                                             python script/hf_upload.py \
                                                 --hf_token $hf_token \
                                                 --repo_dir $repo_dir \
@@ -133,5 +133,5 @@ do
 done
 
 ### usage
-# CUDA_VISIBLE_DEVICES=3 nohup bash sh/finetune_LoRA.sh > sh_logs/llima_swa_quantize_2023_11_02_0910.log 2> sh_logs/error_swa_r8a16_quantize_2023_11_02_0910.log &
-# CUDA_VISIBLE_DEVICES=3 bash sh/finetune_LoRA.sh
+# CUDA_VISIBLE_DEVICES=0 nohup bash sh/finetune_LoRA.sh > sh_logs/2023_11_07_1239.log 2> sh_logs/error_2023_11_07_1239.log &
+# CUDA_VISIBLE_DEVICES=0 bash sh/finetune_LoRA.sh

@@ -531,4 +531,4 @@ LoRA path
 lit_model_{ave|nonave}_lora_{optimizer}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}.pth
 
 huggingface repo
-{repo_id}/{model}_{dataset}_{optimizer}_{quantize}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{scheduler}_{date}
+{repo_id}/{model}_{dataset}_{optimizer}_{quantize}_{iters}_{batch_size}_{micro_batch_size}_{learning_rate}_{weight_decay}_{date}
